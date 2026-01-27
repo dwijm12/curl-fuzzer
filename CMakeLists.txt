@@ -452,11 +452,14 @@ if(CURL_TOOL_SRC_DIR AND EXISTS "${CURL_TOOL_SRC_DIR}")
         add_dependencies(curl_fuzzer_cli ${FUZZ_DEPS})
 
         message(STATUS "curl CLI fuzzer target added: curl_fuzzer_cli")
+        set(CURL_CLI_FUZZER_TARGET curl_fuzzer_cli)
     else()
         message(STATUS "No curl tool sources found, skipping curl CLI fuzzer")
+        set(CURL_CLI_FUZZER_TARGET "")
     endif()
 else()
     message(STATUS "Curl tool source directory not found, skipping curl CLI fuzzer")
+    set(CURL_CLI_FUZZER_TARGET "")
 endif()
 
 # Create a custom target for all fuzzers
@@ -481,4 +484,5 @@ add_custom_target(fuzz
         curl_fuzzer_bufq
         fuzz_url
         curl_fuzzer_fnmatch
+        ${CURL_CLI_FUZZER_TARGET}
 )
