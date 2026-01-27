@@ -408,6 +408,57 @@ target_link_libraries(curl_fuzzer_fnmatch PRIVATE ${COMMON_LINK_LIBS})
 target_link_options(curl_fuzzer_fnmatch PRIVATE ${COMMON_LINK_OPTIONS})
 add_dependencies(curl_fuzzer_fnmatch ${FUZZ_DEPS})
 
+# curl CLI Fuzzer Target
+# This fuzzer targets the curl command-line tool (src/tool_operate.c) rather
+# than the libcurl library API. It requires access to curl tool sources.
+if(EXISTS "${CMAKE_BINARY_DIR}/curl/src/curl_external")
+    set(CURL_TOOL_SRC_DIR ${CMAKE_BINARY_DIR}/curl/src/curl_external/src)
+elseif(NOT "$ENV{CURL_SOURCE_DIR}" STREQUAL "" AND EXISTS "$ENV{CURL_SOURCE_DIR}/src")
+    set(CURL_TOOL_SRC_DIR $ENV{CURL_SOURCE_DIR}/src)
+endif()
+
+if(CURL_TOOL_SRC_DIR AND EXISTS "${CURL_TOOL_SRC_DIR}")
+    message(STATUS "Building curl CLI fuzzer from: ${CURL_TOOL_SRC_DIR}")
+
+    # Collect curl tool sources (exclude tool_main.c to avoid main() conflict)
+    file(GLOB CURL_TOOL_SOURCES "${CURL_TOOL_SRC_DIR}/tool_*.c")
+    list(FILTER CURL_TOOL_SOURCES EXCLUDE REGEX "tool_main\\.c$")
+
+    if(CURL_TOOL_SOURCES)
+        # Create fuzzer executable
+        add_executable(curl_fuzzer_cli fuzz_curl_cli.c ${CURL_TOOL_SOURCES})
+
+        # Compile options
+        target_compile_options(curl_fuzzer_cli PRIVATE
+            ${COMMON_FLAGS}
+            -DCURL_STRICTER
+        )
+
+        # Include directories
+        target_include_directories(curl_fuzzer_cli PRIVATE
+            ${CURL_INCLUDE_DIRS}
+            ${CURL_TOOL_SRC_DIR}
+        )
+
+        # Link libraries
+        target_link_libraries(curl_fuzzer_cli PRIVATE
+            ${COMMON_LINK_LIBS}
+        )
+
+        # Link options
+        target_link_options(curl_fuzzer_cli PRIVATE ${COMMON_LINK_OPTIONS})
+
+        # Dependencies
+        add_dependencies(curl_fuzzer_cli ${FUZZ_DEPS})
+
+        message(STATUS "curl CLI fuzzer target added: curl_fuzzer_cli")
+    else()
+        message(STATUS "No curl tool sources found, skipping curl CLI fuzzer")
+    endif()
+else()
+    message(STATUS "Curl tool source directory not found, skipping curl CLI fuzzer")
+endif()
+
 # Create a custom target for all fuzzers
 add_custom_target(fuzz
     DEPENDS
