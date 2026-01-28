@@ -261,9 +261,9 @@ static int parse_fuzz_args(const uint8_t *data, size_t size, char **argv,
      * If num_args is unreasonably large, this is likely not a valid
      * fuzzer input (e.g., HTTP response being interpreted as TLV). */
     if(num_args > 256) {
-        /* Invalid input format - reject */
+        /* Invalid input format - reject by returning error code */
         *offset = size;
-        return 0;
+        return -1;  /* Signal to caller that input is invalid */
     }
 
     /* Cap to reasonable number for actual processing */
@@ -572,8 +572,21 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /* Add safety arguments */
     add_safety_args(argv, &argc);
 
-    /* Parse fuzz input into arguments */
-    parse_fuzz_args(data, size, argv, &argc, temp_dir, &file_data_offset);
+    /* Parse fuzz input into arguments
+     * Returns: 0 on success, -1 if input is invalid/rejected */
+    int parse_result = parse_fuzz_args(data, size, argv, &argc, temp_dir, &file_data_offset);
+
+    /* If input was rejected due to invalid format, clean up and exit early */
+    if(parse_result == -1) {
+        cleanup_temp_directory(temp_dir);
+        globalconf_free();
+        memset(&global->state, 0, sizeof(global->state));
+        global->tracetype = TRACE_NONE;
+        global->traceids = FALSE;
+        global->tracetime = FALSE;
+        global->trace_set = FALSE;
+        return 0;
+    }
 
     /* Add parallel flag if requested */
     if(flags & FLAG_PARALLEL) {
