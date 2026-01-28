@@ -351,7 +351,7 @@ set(COMMON_LINK_LIBS
     pthread
     m
 )
-set(COMMON_LINK_OPTIONS ${LIB_FUZZING_ENGINE_FLAG})
+set(COMMON_LINK_OPTIONS ${LIB_FUZZING_ENGINE_FLAG} -Wl,--no-warn-execstack)
 
 # Ensure that curl and its dependencies are built before the fuzzers
 set(FUZZ_DEPS curl_external ${CURL_DEPS} ${LIB_FUZZING_ENGINE_DEP})
