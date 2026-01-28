@@ -424,7 +424,7 @@ set(CURL_LIB_BUILD_DIR "")
 
 # Try mainline.sh environment first (local build)
 if(EXISTS "${CMAKE_BINARY_DIR}/curl/src/curl_external/src")
-    # mainline.sh - curl was downloaded and built locally
+    # mainline.sh - curl was downloaded and built locally with GIT_REPOSITORY
     set(CURL_TOOL_SRC_DIR ${CMAKE_BINARY_DIR}/curl/src/curl_external/src)
     set(CURL_LIB_SRC_DIR ${CMAKE_BINARY_DIR}/curl/src/curl_external/lib)
     # Build-generated headers (curl_config.h, etc.) are in build/lib
@@ -433,9 +433,9 @@ elseif(NOT "$ENV{CURL_SOURCE_DIR}" STREQUAL "" AND EXISTS "$ENV{CURL_SOURCE_DIR}
     # OSS-Fuzz environment - curl source is pre-mounted at /src/curl
     set(CURL_TOOL_SRC_DIR $ENV{CURL_SOURCE_DIR}/src)
     set(CURL_LIB_SRC_DIR $ENV{CURL_SOURCE_DIR}/lib)
-    # In OSS-Fuzz, ExternalProject builds curl and generates curl_config.h at build time
-    # The build directory will be created during build, not at configure time
-    set(CURL_LIB_BUILD_DIR ${CMAKE_BINARY_DIR}/curl/src/curl_external-build/lib)
+    # When ExternalProject uses SOURCE_DIR without PREFIX, build dir is at:
+    # ${CMAKE_BINARY_DIR}/<name>-prefix/src/<name>-build
+    set(CURL_LIB_BUILD_DIR ${CMAKE_BINARY_DIR}/curl_external-prefix/src/curl_external-build/lib)
 endif()
 
 if(CURL_TOOL_SRC_DIR)
