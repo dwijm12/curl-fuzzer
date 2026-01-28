@@ -443,9 +443,10 @@ if(CURL_TOOL_SRC_DIR)
     message(STATUS "  CURL_LIB_SRC_DIR: ${CURL_LIB_SRC_DIR}")
     message(STATUS "  CURL_LIB_BUILD_DIR: ${CURL_LIB_BUILD_DIR}")
 
-    # Collect curl tool sources (all .c files except tool_main.c to avoid main() conflict)
+    # Collect curl tool sources (all .c files except those with main() functions)
     file(GLOB CURL_TOOL_SOURCES "${CURL_TOOL_SRC_DIR}/*.c")
     list(FILTER CURL_TOOL_SOURCES EXCLUDE REGEX "tool_main\\.c$")
+    list(FILTER CURL_TOOL_SOURCES EXCLUDE REGEX "curlinfo\\.c$")
 
     # Collect curlx sources needed by curl tool
     set(CURLX_SOURCES
@@ -466,9 +467,14 @@ if(CURL_TOOL_SRC_DIR)
         ${CURL_LIB_SRC_DIR}/curlx/winapi.c
     )
 
+    # Collect toolx sources (tool-specific utilities)
+    set(TOOLX_SOURCES
+        ${CURL_TOOL_SRC_DIR}/toolx/tool_time.c
+    )
+
     if(CURL_TOOL_SOURCES)
         # Create fuzzer executable
-        add_executable(curl_fuzzer_cli fuzz_curl_cli.c ${CURL_TOOL_SOURCES} ${CURLX_SOURCES})
+        add_executable(curl_fuzzer_cli fuzz_curl_cli.c ${CURL_TOOL_SOURCES} ${CURLX_SOURCES} ${TOOLX_SOURCES})
 
         # Compile options
         target_compile_options(curl_fuzzer_cli PRIVATE
@@ -483,6 +489,7 @@ if(CURL_TOOL_SRC_DIR)
             ${CURL_LIB_BUILD_DIR}
             ${CURL_LIB_SRC_DIR}
             ${CURL_TOOL_SRC_DIR}
+            ${CURL_TOOL_SRC_DIR}/toolx
             ${CURL_INCLUDE_DIRS}
         )
 
