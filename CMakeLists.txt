@@ -481,4 +481,5 @@ add_custom_target(fuzz
         curl_fuzzer_bufq
         fuzz_url
         curl_fuzzer_fnmatch
+        curl_fuzzer_cli
 )
