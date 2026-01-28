@@ -245,6 +245,7 @@ set(CURL_CMAKE_ARGS
     -DCURL_HIDDEN_SYMBOLS=OFF
     -DBUILD_CURL_EXE=OFF -DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF
     -DCURL_USE_LIBPSL=OFF
+    -DCURL_BROTLI=OFF
     ${CURL_SSL_OPTION}
     -DZLIB_INCLUDE_DIR=${ZLIB_INSTALL_DIR}/include
     -DZLIB_LIBRARY=${ZLIB_STATIC_LIB}
@@ -418,16 +419,35 @@ add_dependencies(curl_fuzzer_fnmatch ${FUZZ_DEPS})
 
 # Check if we have curl tool sources available NOW (at configuration time)
 set(CURL_TOOL_SRC_DIR "")
-if(NOT "$ENV{CURL_SOURCE_DIR}" STREQUAL "" AND EXISTS "$ENV{CURL_SOURCE_DIR}/src")
-    # OSS-Fuzz environment - curl source is pre-mounted
-    set(CURL_TOOL_SRC_DIR $ENV{CURL_SOURCE_DIR}/src)
-elseif(EXISTS "${CMAKE_BINARY_DIR}/curl/src/curl_external/src")
-    # mainline.sh second run - curl was already downloaded
+set(CURL_LIB_SRC_DIR "")
+set(CURL_LIB_BUILD_DIR "")
+
+# Try mainline.sh environment first (local build)
+if(EXISTS "${CMAKE_BINARY_DIR}/curl/src/curl_external/src")
+    # mainline.sh - curl was downloaded and built locally
     set(CURL_TOOL_SRC_DIR ${CMAKE_BINARY_DIR}/curl/src/curl_external/src)
+    set(CURL_LIB_SRC_DIR ${CMAKE_BINARY_DIR}/curl/src/curl_external/lib)
+    # Build-generated headers (curl_config.h, etc.) are in build/lib
+    set(CURL_LIB_BUILD_DIR ${CMAKE_BINARY_DIR}/curl/src/curl_external-build/lib)
+elseif(NOT "$ENV{CURL_SOURCE_DIR}" STREQUAL "" AND EXISTS "$ENV{CURL_SOURCE_DIR}/src")
+    # OSS-Fuzz environment - curl source is pre-mounted at /src/curl
+    set(CURL_TOOL_SRC_DIR $ENV{CURL_SOURCE_DIR}/src)
+    set(CURL_LIB_SRC_DIR $ENV{CURL_SOURCE_DIR}/lib)
+    # In OSS-Fuzz, curl is built by build.sh, config headers are in $WORK/build/lib
+    # We need to find where the curl build directory is
+    # Try common OSS-Fuzz build locations
+    if(EXISTS "$ENV{WORK}/build/lib/curl_config.h")
+        set(CURL_LIB_BUILD_DIR $ENV{WORK}/build/lib)
+    else()
+        # Fallback - use install directory (may not have curl_config.h but better than nothing)
+        set(CURL_LIB_BUILD_DIR ${CURL_INSTALL_DIR}/include)
+    endif()
 endif()
 
 if(CURL_TOOL_SRC_DIR)
     message(STATUS "Building curl CLI fuzzer from: ${CURL_TOOL_SRC_DIR}")
+    message(STATUS "  CURL_LIB_SRC_DIR: ${CURL_LIB_SRC_DIR}")
+    message(STATUS "  CURL_LIB_BUILD_DIR: ${CURL_LIB_BUILD_DIR}")
 
     # Collect curl tool sources (exclude tool_main.c to avoid main() conflict)
     file(GLOB CURL_TOOL_SOURCES "${CURL_TOOL_SRC_DIR}/tool_*.c")
@@ -444,9 +464,12 @@ if(CURL_TOOL_SRC_DIR)
         )
 
         # Include directories
+        # Note: Order matters - build dir first for generated headers
         target_include_directories(curl_fuzzer_cli PRIVATE
-            ${CURL_INCLUDE_DIRS}
+            ${CURL_LIB_BUILD_DIR}
+            ${CURL_LIB_SRC_DIR}
             ${CURL_TOOL_SRC_DIR}
+            ${CURL_INCLUDE_DIRS}
         )
 
         # Link libraries
