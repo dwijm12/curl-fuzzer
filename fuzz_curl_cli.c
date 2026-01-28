@@ -662,11 +662,20 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
      * IMPORTANT: globalconf_free() calls curl_global_cleanup() internally.
      * This is expensive but necessary to properly reset libcurl's global state.
      *
-     * NOTE: We do NOT memset the global config after globalconf_free() because
-     * globalconf_free() already sets the critical fields (first, last, etc.) to NULL,
-     * and globalconf_init() will properly reinitialize everything in the next iteration.
-     * Memsetting can interfere with curl's internal state management. */
+     * BUG FIX: globalconf_free() does not reset several fields, which can cause
+     * crashes on the next iteration. We must explicitly reset these fields. */
     globalconf_free();
+
+    /* Reset trace-related fields that aren't cleared by globalconf_free() */
+    global->tracetype = TRACE_NONE;
+    global->traceids = FALSE;
+    global->tracetime = FALSE;
+    global->trace_set = FALSE;
+
+    /* Reset state structure to prevent use-after-free
+     * BUG FIX: global->state.urlnode can point to freed memory after config_free()
+     * This causes heap-use-after-free in create_single() on next iteration */
+    memset(&global->state, 0, sizeof(global->state));
 
     return 0;
 }
