@@ -660,21 +660,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     /* Global cleanup to prevent state leakage between iterations
      * IMPORTANT: globalconf_free() calls curl_global_cleanup() internally.
-     * This is expensive but necessary to properly reset libcurl's global state. */
-    globalconf_free();
-
-    /* CRITICAL: Zero out the entire globalconf struct to prevent ANY state leakage.
-     * globalconf_free() doesn't reset all fields, and manual field-by-field reset
-     * is brittle and version-dependent. Memset is the most robust solution.
+     * This is expensive but necessary to properly reset libcurl's global state.
      *
-     * This is safe because:
-     * 1. globalconf_free() has already freed all dynamically allocated memory
-     * 2. global->first and global->last are already NULL after globalconf_free()
-     * 3. The next iteration will call globalconf_init() which will properly
-     *    initialize all fields before use */
-    if(global) {
-        memset(global, 0, sizeof(struct GlobalConfig));
-    }
+     * NOTE: We do NOT memset the global config after globalconf_free() because
+     * globalconf_free() already sets the critical fields (first, last, etc.) to NULL,
+     * and globalconf_init() will properly reinitialize everything in the next iteration.
+     * Memsetting can interfere with curl's internal state management. */
+    globalconf_free();
 
     return 0;
 }
