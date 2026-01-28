@@ -256,7 +256,17 @@ static int parse_fuzz_args(const uint8_t *data, size_t size, char **argv,
     /* Parse number of arguments (bytes 1-2, big endian) */
     uint16_t num_args = ((uint16_t)data[1] << 8) | data[2];
 
-    /* Cap to reasonable number */
+    /* SECURITY: Reject obviously malformed input early to prevent
+     * processing garbage data that could trigger crashes.
+     * If num_args is unreasonably large, this is likely not a valid
+     * fuzzer input (e.g., HTTP response being interpreted as TLV). */
+    if(num_args > 256) {
+        /* Invalid input format - reject */
+        *offset = size;
+        return 0;
+    }
+
+    /* Cap to reasonable number for actual processing */
     if(num_args > 20) {
         num_args = 20;
     }
