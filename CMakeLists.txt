@@ -351,7 +351,7 @@ set(COMMON_LINK_LIBS
     pthread
     m
 )
-set(COMMON_LINK_OPTIONS ${LIB_FUZZING_ENGINE_FLAG} -Wl,--no-warn-execstack)
+set(COMMON_LINK_OPTIONS ${LIB_FUZZING_ENGINE_FLAG})
 
 # Ensure that curl and its dependencies are built before the fuzzers
 set(FUZZ_DEPS curl_external ${CURL_DEPS} ${LIB_FUZZING_ENGINE_DEP})
@@ -470,6 +470,7 @@ else()
 endif()
 
 # Create a custom target for all fuzzers
+# Note: curl_fuzzer_cli is conditionally added below if it was built
 add_custom_target(fuzz
     DEPENDS
         curl_fuzzer
@@ -491,5 +492,9 @@ add_custom_target(fuzz
         curl_fuzzer_bufq
         fuzz_url
         curl_fuzzer_fnmatch
-        curl_fuzzer_cli
 )
+
+# Add curl_fuzzer_cli to fuzz target only if it was created
+if(TARGET curl_fuzzer_cli)
+    add_dependencies(fuzz curl_fuzzer_cli)
+endif()
