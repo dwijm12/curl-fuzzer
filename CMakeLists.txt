@@ -245,6 +245,7 @@ set(CURL_CMAKE_ARGS
     -DCURL_HIDDEN_SYMBOLS=OFF
     -DBUILD_CURL_EXE=OFF -DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF
     -DCURL_USE_LIBPSL=OFF
+    -DCURL_BROTLI=OFF
     ${CURL_SSL_OPTION}
     -DZLIB_INCLUDE_DIR=${ZLIB_INSTALL_DIR}/include
     -DZLIB_LIBRARY=${ZLIB_STATIC_LIB}
@@ -411,13 +412,21 @@ add_dependencies(curl_fuzzer_fnmatch ${FUZZ_DEPS})
 # curl CLI Fuzzer Target
 # This fuzzer targets the curl command-line tool (src/tool_operate.c) rather
 # than the libcurl library API. It requires access to curl tool sources.
-if(EXISTS "${CMAKE_BINARY_DIR}/curl/src/curl_external")
-    set(CURL_TOOL_SRC_DIR ${CMAKE_BINARY_DIR}/curl/src/curl_external/src)
-elseif(NOT "$ENV{CURL_SOURCE_DIR}" STREQUAL "" AND EXISTS "$ENV{CURL_SOURCE_DIR}/src")
+#
+# In OSS-Fuzz environment: CURL_SOURCE_DIR is set to /src/curl (pre-existing)
+# In mainline.sh: curl is downloaded to build/curl/src/curl_external (won't exist at config time)
+
+# Check if we have curl tool sources available NOW (at configuration time)
+set(CURL_TOOL_SRC_DIR "")
+if(NOT "$ENV{CURL_SOURCE_DIR}" STREQUAL "" AND EXISTS "$ENV{CURL_SOURCE_DIR}/src")
+    # OSS-Fuzz environment - curl source is pre-mounted
     set(CURL_TOOL_SRC_DIR $ENV{CURL_SOURCE_DIR}/src)
+elseif(EXISTS "${CMAKE_BINARY_DIR}/curl/src/curl_external/src")
+    # mainline.sh second run - curl was already downloaded
+    set(CURL_TOOL_SRC_DIR ${CMAKE_BINARY_DIR}/curl/src/curl_external/src)
 endif()
 
-if(CURL_TOOL_SRC_DIR AND EXISTS "${CURL_TOOL_SRC_DIR}")
+if(CURL_TOOL_SRC_DIR)
     message(STATUS "Building curl CLI fuzzer from: ${CURL_TOOL_SRC_DIR}")
 
     # Collect curl tool sources (exclude tool_main.c to avoid main() conflict)
@@ -453,10 +462,12 @@ if(CURL_TOOL_SRC_DIR AND EXISTS "${CURL_TOOL_SRC_DIR}")
 
         message(STATUS "curl CLI fuzzer target added: curl_fuzzer_cli")
     else()
-        message(STATUS "No curl tool sources found, skipping curl CLI fuzzer")
+        message(STATUS "No curl tool sources found at ${CURL_TOOL_SRC_DIR}, skipping curl CLI fuzzer")
     endif()
 else()
-    message(STATUS "Curl tool source directory not found, skipping curl CLI fuzzer")
+    message(STATUS "Curl tool source directory not available at configuration time, skipping curl CLI fuzzer")
+    message(STATUS "  For OSS-Fuzz: CURL_SOURCE_DIR environment variable should be set")
+    message(STATUS "  For mainline.sh: Run build twice, or set CURL_SOURCE_DIR to a local curl checkout")
 endif()
 
 # Create a custom target for all fuzzers
