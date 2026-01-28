@@ -455,6 +455,7 @@ if(CURL_TOOL_SRC_DIR)
         target_compile_options(curl_fuzzer_cli PRIVATE
             ${COMMON_FLAGS}
             -DCURL_STRICTER
+            -DHAVE_CONFIG_H
         )
 
         # Include directories
