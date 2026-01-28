@@ -443,13 +443,32 @@ if(CURL_TOOL_SRC_DIR)
     message(STATUS "  CURL_LIB_SRC_DIR: ${CURL_LIB_SRC_DIR}")
     message(STATUS "  CURL_LIB_BUILD_DIR: ${CURL_LIB_BUILD_DIR}")
 
-    # Collect curl tool sources (exclude tool_main.c to avoid main() conflict)
-    file(GLOB CURL_TOOL_SOURCES "${CURL_TOOL_SRC_DIR}/tool_*.c")
+    # Collect curl tool sources (all .c files except tool_main.c to avoid main() conflict)
+    file(GLOB CURL_TOOL_SOURCES "${CURL_TOOL_SRC_DIR}/*.c")
     list(FILTER CURL_TOOL_SOURCES EXCLUDE REGEX "tool_main\\.c$")
+
+    # Collect curlx sources needed by curl tool
+    set(CURLX_SOURCES
+        ${CURL_LIB_SRC_DIR}/curlx/base64.c
+        ${CURL_LIB_SRC_DIR}/curlx/basename.c
+        ${CURL_LIB_SRC_DIR}/curlx/dynbuf.c
+        ${CURL_LIB_SRC_DIR}/curlx/fopen.c
+        ${CURL_LIB_SRC_DIR}/curlx/multibyte.c
+        ${CURL_LIB_SRC_DIR}/curlx/nonblock.c
+        ${CURL_LIB_SRC_DIR}/curlx/strcopy.c
+        ${CURL_LIB_SRC_DIR}/curlx/strerr.c
+        ${CURL_LIB_SRC_DIR}/curlx/strparse.c
+        ${CURL_LIB_SRC_DIR}/curlx/timediff.c
+        ${CURL_LIB_SRC_DIR}/curlx/timeval.c
+        ${CURL_LIB_SRC_DIR}/curlx/version_win32.c
+        ${CURL_LIB_SRC_DIR}/curlx/wait.c
+        ${CURL_LIB_SRC_DIR}/curlx/warnless.c
+        ${CURL_LIB_SRC_DIR}/curlx/winapi.c
+    )
 
     if(CURL_TOOL_SOURCES)
         # Create fuzzer executable
-        add_executable(curl_fuzzer_cli fuzz_curl_cli.c ${CURL_TOOL_SOURCES})
+        add_executable(curl_fuzzer_cli fuzz_curl_cli.c ${CURL_TOOL_SOURCES} ${CURLX_SOURCES})
 
         # Compile options
         target_compile_options(curl_fuzzer_cli PRIVATE
