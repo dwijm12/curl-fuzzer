@@ -433,15 +433,9 @@ elseif(NOT "$ENV{CURL_SOURCE_DIR}" STREQUAL "" AND EXISTS "$ENV{CURL_SOURCE_DIR}
     # OSS-Fuzz environment - curl source is pre-mounted at /src/curl
     set(CURL_TOOL_SRC_DIR $ENV{CURL_SOURCE_DIR}/src)
     set(CURL_LIB_SRC_DIR $ENV{CURL_SOURCE_DIR}/lib)
-    # In OSS-Fuzz, curl is built by build.sh, config headers are in $WORK/build/lib
-    # We need to find where the curl build directory is
-    # Try common OSS-Fuzz build locations
-    if(EXISTS "$ENV{WORK}/build/lib/curl_config.h")
-        set(CURL_LIB_BUILD_DIR $ENV{WORK}/build/lib)
-    else()
-        # Fallback - use install directory (may not have curl_config.h but better than nothing)
-        set(CURL_LIB_BUILD_DIR ${CURL_INSTALL_DIR}/include)
-    endif()
+    # In OSS-Fuzz, ExternalProject builds curl and generates curl_config.h at build time
+    # The build directory will be created during build, not at configure time
+    set(CURL_LIB_BUILD_DIR ${CMAKE_BINARY_DIR}/curl/src/curl_external-build/lib)
 endif()
 
 if(CURL_TOOL_SRC_DIR)
