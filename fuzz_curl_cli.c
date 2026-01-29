@@ -548,6 +548,15 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         return 0;
     }
 
+    /* CRITICAL FIX for OSS-Fuzz: Explicitly reinitialize libcurl.
+     * Even though globalconf_init() calls curl_global_init() internally,
+     * OSS-Fuzz's build environment requires explicit reinitialization
+     * after each curl_global_cleanup() to prevent memory corruption. */
+    if(curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
+        globalconf_free();
+        return 0;
+    }
+
     /* Parse control flags */
     uint8_t flags = data[0];
 
