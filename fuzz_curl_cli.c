@@ -521,6 +521,23 @@ static void cleanup_argv(void) {
     allocated_count = 0;
 }
 
+/* One-time initialization called by LibFuzzer before any test inputs.
+ * CRITICAL: Initialize libcurl's global state ONCE here, not per-iteration.
+ * Calling curl_global_init/cleanup repeatedly causes memory corruption
+ * in OSS-Fuzz build environment. */
+int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    (void)argc;
+    (void)argv;
+
+    /* Initialize libcurl global state once for entire fuzzing session */
+    if(curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
+        fprintf(stderr, "FATAL: curl_global_init failed\n");
+        return -1;
+    }
+
+    return 0;
+}
+
 /* Main fuzzer entry point */
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /* Minimum size check */
@@ -542,18 +559,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /* Initialize global config (required for operate())
      * NOTE: This must be called each iteration because operate() modifies global state.
      * However, globalconf_init() doesn't fully reset the static globalconf struct,
-     * which can cause state leakage between iterations. */
+     * which can cause state leakage between iterations.
+     *
+     * IMPORTANT: We do NOT call curl_global_init() here anymore - it's called
+     * once in LLVMFuzzerInitialize(). Calling it repeatedly causes corruption. */
     if(globalconf_init() != CURLE_OK) {
-        curl_global_cleanup();
-        return 0;
-    }
-
-    /* CRITICAL FIX for OSS-Fuzz: Explicitly reinitialize libcurl.
-     * Even though globalconf_init() calls curl_global_init() internally,
-     * OSS-Fuzz's build environment requires explicit reinitialization
-     * after each curl_global_cleanup() to prevent memory corruption. */
-    if(curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
-        globalconf_free();
         return 0;
     }
 
@@ -701,15 +711,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     cleanup_temp_directory(temp_dir);
 
     /* Global cleanup to prevent state leakage between iterations
-     * IMPORTANT: We must clean up in the correct order to prevent memory corruption:
-     * 1. Free tool-specific config (globalconf_free)
-     * 2. Clean up libcurl global state (curl_global_cleanup)
-     * 3. Reset our local state tracking
+     * IMPORTANT: We do NOT call curl_global_cleanup() here anymore.
+     * libcurl is initialized once in LLVMFuzzerInitialize() and stays
+     * initialized for the entire fuzzing session. Calling cleanup/init
+     * repeatedly causes memory corruption in OSS-Fuzz environment.
      *
      * BUG FIX: globalconf_free() does not reset several fields, which can cause
      * crashes on the next iteration. We must explicitly reset these fields. */
     globalconf_free();
-    curl_global_cleanup();
 
     /* Reset trace-related fields that aren't cleared by globalconf_free() */
     global->tracetype = TRACE_NONE;
