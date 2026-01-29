@@ -531,11 +531,20 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /* Ignore SIGPIPE to prevent crashes from broken pipes */
     signal(SIGPIPE, SIG_IGN);
 
+    /* Initialize libcurl's global state
+     * CRITICAL: Must be called before any curl operations to ensure clean state.
+     * This is especially important in OSS-Fuzz environments where memory layout
+     * and allocator behavior may differ from standard builds. */
+    if(curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
+        return 0;
+    }
+
     /* Initialize global config (required for operate())
      * NOTE: This must be called each iteration because operate() modifies global state.
      * However, globalconf_init() doesn't fully reset the static globalconf struct,
      * which can cause state leakage between iterations. */
     if(globalconf_init() != CURLE_OK) {
+        curl_global_cleanup();
         return 0;
     }
 
@@ -580,6 +589,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if(parse_result == -1) {
         cleanup_temp_directory(temp_dir);
         globalconf_free();
+        curl_global_cleanup();
         memset(&global->state, 0, sizeof(global->state));
         global->tracetype = TRACE_NONE;
         global->traceids = FALSE;
@@ -682,12 +692,15 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     cleanup_temp_directory(temp_dir);
 
     /* Global cleanup to prevent state leakage between iterations
-     * IMPORTANT: globalconf_free() calls curl_global_cleanup() internally.
-     * This is expensive but necessary to properly reset libcurl's global state.
+     * IMPORTANT: We must clean up in the correct order to prevent memory corruption:
+     * 1. Free tool-specific config (globalconf_free)
+     * 2. Clean up libcurl global state (curl_global_cleanup)
+     * 3. Reset our local state tracking
      *
      * BUG FIX: globalconf_free() does not reset several fields, which can cause
      * crashes on the next iteration. We must explicitly reset these fields. */
     globalconf_free();
+    curl_global_cleanup();
 
     /* Reset trace-related fields that aren't cleared by globalconf_free() */
     global->tracetype = TRACE_NONE;
